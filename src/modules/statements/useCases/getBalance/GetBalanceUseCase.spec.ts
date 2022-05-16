@@ -1,0 +1,61 @@
+import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/InMemoryUsersRepository"
+import { AuthenticateUserUseCase } from "../../../users/useCases/authenticateUser/AuthenticateUserUseCase"
+import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase"
+import { ICreateUserDTO } from "../../../users/useCases/createUser/ICreateUserDTO"
+import { OperationType } from "../../entities/Statement"
+import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository"
+import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase"
+import { GetBalanceUseCase } from "./GetBalanceUseCase"
+
+
+let createUserUseCase: CreateUserUseCase
+let authenticateUserUseCase: AuthenticateUserUseCase
+let inMemoryUsersRepository: InMemoryUsersRepository
+let inMemoryStatementsRepository: InMemoryStatementsRepository
+let createStatementUseCase: CreateStatementUseCase
+let getBalanceUseCase: GetBalanceUseCase
+
+describe('Get Balance Use Case', () => {
+  beforeEach(() => {
+    inMemoryUsersRepository = new InMemoryUsersRepository()
+    inMemoryStatementsRepository = new InMemoryStatementsRepository()
+
+    createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository)
+    authenticateUserUseCase = new AuthenticateUserUseCase(inMemoryUsersRepository)
+    createStatementUseCase = new CreateStatementUseCase(inMemoryUsersRepository, inMemoryStatementsRepository)
+    getBalanceUseCase = new GetBalanceUseCase(inMemoryStatementsRepository, inMemoryUsersRepository)
+  })
+
+  it('should be able get balance', async () => {
+    const user: ICreateUserDTO = {
+      name: 'User Test',
+      email: 'test@gmail.com',
+      password: '1234'
+    }
+
+    await createUserUseCase.execute(user)
+
+    const authUser = await authenticateUserUseCase.execute({
+      email: user.email,
+      password: user.password
+    })
+
+    await createStatementUseCase.execute({
+      user_id: String(authUser.user.id),
+      amount: 2000,
+      description: 'Salario',
+      type: OperationType.DEPOSIT
+    })
+
+    await createStatementUseCase.execute({
+      user_id: String(authUser.user.id),
+      amount: 200,
+      description: 'Mercado',
+      type: OperationType.WITHDRAW
+    })
+
+    const getBalance = await getBalanceUseCase.execute({ user_id: String(authUser.user.id) })
+
+    expect(getBalance).toHaveProperty('balance')
+  })
+})
